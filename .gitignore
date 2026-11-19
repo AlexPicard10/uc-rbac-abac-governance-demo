@@ -1,0 +1,8 @@
+.venv/
+.databricks/
+__pycache__/
+*.pyc
+.DS_Store
+
+# Internal NDA reference material — never distribute
+Documentation/

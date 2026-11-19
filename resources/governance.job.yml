@@ -1,0 +1,24 @@
+# Convenience job: runs the WORKSPACE-level governance SQL on a SQL warehouse.
+# Prereq: run `python driver/10_identity_setup.py` first (account groups + ASSUME),
+# because 01_governed_tag_abac.sql grants to and targets the role groups.
+#
+# Note: these SQL files are first-run idempotent except CREATE GOVERNED TAG
+# (no IF NOT EXISTS); on a re-run use `python driver/20_governance.py`, which
+# tolerates "already exists". Genie + validation run from the Python driver.
+resources:
+  jobs:
+    governance_setup:
+      name: Governance Setup (RBAC + ABAC)
+      tasks:
+        - task_key: generate_data
+          sql_task:
+            warehouse_id: ${var.warehouse_id}
+            file:
+              path: ../sql/00_generate_data.sql
+        - task_key: governed_tag_abac
+          depends_on:
+            - task_key: generate_data
+          sql_task:
+            warehouse_id: ${var.warehouse_id}
+            file:
+              path: ../sql/01_governed_tag_abac.sql

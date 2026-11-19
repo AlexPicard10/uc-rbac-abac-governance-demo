@@ -1,0 +1,482 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<link rel="icon" type="image/svg+xml" href="favicon.svg" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Unity Catalog RBAC + ABAC Demo</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<style>
+  :root{
+    --blue:#00BDFF; --deep:#003D7C; --navy:#001E62; --glow:#5BD7FF;
+    --magenta:#E5005B; --coral:#FF7A59; --green:#00C389;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%;overflow:hidden}
+  body{
+    font-family:Inter,system-ui,sans-serif;color:#0A1A2F;
+    background:
+      radial-gradient(1200px 700px at 80% -10%, rgba(0,170,255,.10), transparent 60%),
+      radial-gradient(900px 500px at -10% 20%, rgba(229,0,91,.06), transparent 60%),
+      linear-gradient(180deg,#F9FBFD 0%,#EFF4FA 100%);
+  }
+  /* animated background */
+  .bg{position:fixed;inset:0;z-index:-1;overflow:hidden}
+  .blob{position:absolute;border-radius:50%;filter:blur(120px)}
+  .b1{width:60vmax;height:60vmax;top:-15%;left:55%;opacity:.5;background:radial-gradient(circle at 30% 30%,#00AAFF,rgba(0,170,255,0) 60%);animation:d1 18s ease-in-out infinite}
+  .b2{width:55vmax;height:55vmax;top:40%;left:-15%;opacity:.4;background:radial-gradient(circle at 50% 50%,#E5005B,rgba(229,0,91,0) 65%);animation:d2 22s ease-in-out infinite}
+  .b3{width:45vmax;height:45vmax;top:70%;left:50%;opacity:.3;background:radial-gradient(circle at 50% 50%,#00C389,rgba(0,195,137,0) 70%);animation:d3 25s ease-in-out infinite}
+  @keyframes d1{0%,100%{transform:translate(0,0)}50%{transform:translate(40px,30px)}}
+  @keyframes d2{0%,100%{transform:translate(0,0)}50%{transform:translate(-30px,20px)}}
+  @keyframes d3{0%,100%{transform:translate(0,0)}50%{transform:translate(20px,-20px)}}
+  .dots-grid{position:fixed;inset:0;z-index:-1;opacity:.35;background-image:radial-gradient(rgba(0,30,98,.18) 1px,transparent 1px);background-size:24px 24px;-webkit-mask-image:radial-gradient(ellipse at center,#000 30%,transparent 80%);mask-image:radial-gradient(ellipse at center,#000 30%,transparent 80%)}
+
+  /* nav */
+  header{position:fixed;top:0;left:0;right:0;z-index:40;height:64px;display:flex;align-items:center;border-bottom:1px solid rgba(255,255,255,.4);background:rgba(255,255,255,.6);backdrop-filter:blur(16px)}
+  .wrap{width:100%;max-width:80rem;margin:0 auto;padding:0 24px;display:flex;align-items:center;justify-content:space-between}
+  .brand{display:flex;align-items:center;gap:10px;text-decoration:none}
+  .brand .t1{font-family:"Plus Jakarta Sans";font-weight:700;font-size:14px;color:var(--navy)}
+  .brand .t2{font-family:"JetBrains Mono";font-size:10px;letter-spacing:.2em;text-transform:uppercase;color:rgba(0,61,124,.6)}
+  nav a{font-size:14px;font-weight:500;color:rgba(0,30,98,.8);text-decoration:none;padding:6px 12px;border-radius:999px}
+  nav a:hover{color:var(--navy)}
+  .navlinks{display:none;gap:4px}
+  @media(min-width:880px){.navlinks{display:flex}}
+  .btn{display:inline-flex;align-items:center;gap:8px;border-radius:999px;background:var(--deep);color:#fff;font-size:14px;font-weight:600;padding:10px 20px;text-decoration:none;box-shadow:0 0 60px -10px rgba(0,189,255,.45);transition:background .2s}
+  .btn:hover{background:var(--blue)}
+
+  /* slides */
+  main{position:relative;height:100vh}
+  .slide{position:absolute;inset:0;display:none;overflow-y:auto;padding:88px 24px 96px}
+  .slide.active{display:block;animation:fade .45s ease}
+  @keyframes fade{from{opacity:0;transform:translateX(40px)}to{opacity:1;transform:translateX(0)}}
+  .inner{max-width:80rem;margin:0 auto;min-height:calc(100vh - 184px);display:flex;flex-direction:column;justify-content:center}
+
+  .kicker{font-family:"JetBrains Mono";font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:rgba(0,61,124,.7);display:flex;align-items:center;gap:8px;margin-bottom:12px}
+  .kicker .n{color:var(--magenta)} .kicker .ln{height:1px;width:24px;background:rgba(0,61,124,.3)}
+  h1{font-family:"Plus Jakarta Sans";font-weight:800;font-size:clamp(40px,7vw,76px);line-height:1.03;letter-spacing:-.02em;color:var(--navy)}
+  h2{font-family:"Plus Jakarta Sans";font-weight:700;font-size:clamp(30px,4.5vw,44px);line-height:1.1;letter-spacing:-.01em;color:var(--navy)}
+  .sub{margin-top:16px;max-width:46rem;font-size:clamp(16px,1.6vw,19px);line-height:1.6;color:rgba(0,30,98,.7)}
+  .grad{background:linear-gradient(135deg,#00AAFF,#0033A0 65%,#001E62);-webkit-background-clip:text;background-clip:text;color:transparent}
+  .grad-m{background:linear-gradient(135deg,#E5005B,#FF7A59);-webkit-background-clip:text;background-clip:text;color:transparent}
+  .grad-g{background:linear-gradient(135deg,#00C389,#00AAFF);-webkit-background-clip:text;background-clip:text;color:transparent}
+
+  .pill,.pill-m,.pill-g{display:inline-flex;align-items:center;gap:6px;border-radius:999px;padding:4px 10px;font-size:11px;font-weight:500}
+  .pill{border:1px solid rgba(0,189,255,.2);background:rgba(0,189,255,.05);color:var(--deep)}
+  .pill-m{border:1px solid rgba(229,0,91,.3);background:rgba(229,0,91,.05);color:var(--magenta)}
+  .pill-g{border:1px solid rgba(0,195,137,.3);background:rgba(0,195,137,.05);color:var(--green)}
+  .mono{font-family:"JetBrains Mono";font-size:12px;border:1px solid rgba(0,61,124,.15);background:rgba(0,61,124,.04);color:var(--deep);border-radius:6px;padding:2px 6px;display:inline-block}
+
+  .card{border-radius:16px;border:1px solid rgba(255,255,255,.7);background:rgba(255,255,255,.78);backdrop-filter:blur(16px);box-shadow:0 1px 0 rgba(255,255,255,.7) inset,0 12px 30px -12px rgba(0,30,98,.18);padding:22px}
+  .card-dark{border-radius:16px;border:1px solid rgba(255,255,255,.1);color:#fff;background:linear-gradient(180deg,rgba(255,255,255,.04),rgba(255,255,255,0) 60%),linear-gradient(180deg,#001A4F,#000B2A);box-shadow:0 30px 60px -20px rgba(0,0,0,.6);padding:32px}
+  .grid{display:grid;gap:18px}
+  .g2{grid-template-columns:1fr} .g3{grid-template-columns:1fr} .g4{grid-template-columns:1fr 1fr}
+  @media(min-width:720px){.g2{grid-template-columns:1fr 1fr}.g3{grid-template-columns:1fr 1fr 1fr}.g4{grid-template-columns:repeat(4,1fr)}}
+  .stat .v{font-family:"Plus Jakarta Sans";font-weight:700;font-size:30px;color:var(--navy);margin-top:10px}
+  .stat .l{font-size:14px;color:rgba(0,30,98,.6);margin-top:4px}
+  .ic{width:44px;height:44px;border-radius:12px;background:#fff;box-shadow:0 8px 24px -10px rgba(0,30,98,.2);display:flex;align-items:center;justify-content:center;font-size:22px}
+  .row{display:flex;align-items:center;gap:12px}
+  .muted{color:rgba(0,30,98,.65);font-size:14px;line-height:1.55}
+  .chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
+  .chip{font-family:"JetBrains Mono";font-size:11px;color:rgba(0,30,98,.7);background:rgba(0,30,98,.04);border-radius:6px;padding:2px 8px}
+  .cc{width:48px;height:40px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-family:"JetBrains Mono";font-weight:600;font-size:14px}
+  .ok{color:var(--green)} .no{color:var(--magenta)}
+  pre{overflow-x:auto;font-family:"JetBrains Mono";font-size:12.5px;line-height:1.55;color:rgba(255,255,255,.85);padding:18px 20px}
+  .codehead{display:flex;align-items:center;gap:6px;border-bottom:1px solid rgba(255,255,255,.1);padding:10px 16px;font-family:"JetBrains Mono";font-size:11px;color:rgba(255,255,255,.5)}
+  .d{width:10px;height:10px;border-radius:50%;background:rgba(255,255,255,.2)}
+  .callout{display:flex;gap:12px;border-radius:16px;padding:16px;margin-top:20px}
+  .step{display:flex;flex-direction:column;gap:12px;padding:16px}
+  @media(min-width:640px){.step{flex-direction:row;align-items:center}}
+  .num{flex:none;width:32px;height:32px;border-radius:50%;background:var(--deep);color:#fff;font-family:"JetBrains Mono";font-weight:700;display:flex;align-items:center;justify-content:center}
+  .oc{display:inline-flex;align-items:center;border-radius:999px;padding:4px 10px;font-family:"JetBrains Mono";font-size:11px}
+  .oc.ok{border:1px solid rgba(0,195,137,.3);background:rgba(0,195,137,.08)}
+  .oc.no{border:1px solid rgba(229,0,91,.3);background:rgba(229,0,91,.07)}
+
+  /* slide navigator */
+  .navi{position:fixed;left:0;right:0;bottom:20px;z-index:40;display:flex;justify-content:center;pointer-events:none}
+  .navi .bar{pointer-events:auto;display:flex;align-items:center;gap:8px;border-radius:999px;border:1px solid rgba(0,61,124,.15);background:rgba(255,255,255,.9);padding:6px 8px;box-shadow:0 12px 30px -12px rgba(0,30,98,.25);backdrop-filter:blur(8px)}
+  .navi button{border:none;background:none;cursor:pointer;width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:var(--navy);font-size:16px}
+  .navi button:disabled{opacity:.3;cursor:not-allowed}
+  .navi .next{background:var(--blue);color:#fff}
+  .pips{display:flex;gap:4px;align-items:center}
+  .pip{height:6px;width:6px;border-radius:999px;background:rgba(0,30,98,.2);border:none;cursor:pointer;transition:all .2s;padding:0}
+  .pip.on{width:24px;background:var(--blue)}
+  .label{font-family:"JetBrains Mono";font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:rgba(0,61,124,.6);padding-left:8px;border-left:1px solid rgba(0,61,124,.1);display:none}
+  @media(min-width:720px){.label{display:inline}}
+</style>
+</head>
+<body>
+  <div class="bg"><div class="blob b1"></div><div class="blob b2"></div><div class="blob b3"></div></div>
+  <div class="dots-grid"></div>
+
+  <header>
+    <div class="wrap">
+      <a class="brand" href="#top">
+        <img src="favicon.svg" width="28" height="28" alt=""/>
+        <span><span class="t1">Unity Catalog · RBAC + ABAC</span><br/><span class="t2">Governance Demo</span></span>
+      </a>
+      <nav class="navlinks">
+        <a href="#domains">Two domains</a><a href="#rbac">RBAC</a><a href="#abac">ABAC</a>
+        <a href="#genie">Genie &amp; Discover</a><a href="#ontology">Ontology</a><a href="#scenario-gov">Demos</a>
+      </nav>
+      <a class="btn" href="#recap">Takeaway</a>
+    </div>
+  </header>
+
+  <main>
+    <!-- 1 · HERO -->
+    <section class="slide" id="top"><div class="inner">
+      <div class="kicker"><img src="favicon.svg" width="20" height="20" alt=""/>&nbsp;Unity Catalog Governance</div>
+      <h1>Access decided by <span class="grad">who you are</span>.</h1>
+      <p class="sub"><b>RBAC</b> selects your active access context; <b>ABAC</b> applies tag-driven row-level protection within it. Proven live on two energy domains — with Genie and Discover enforcing the exact same rules.</p>
+      <div class="chips" style="margin-top:22px">
+        <span class="pill">RBAC · assume a role</span>
+        <span class="pill-m">ABAC · FR + BE row filter</span>
+        <span class="pill">Genie respects it</span>
+        <span class="pill-g">Discover respects it</span>
+        <span class="pill-g">Ontology · governed KPIs</span>
+      </div>
+      <div class="grid g4" style="margin-top:40px">
+        <div class="card stat"><div class="ic">🗂️</div><div class="v">2</div><div class="l">synthetic domains</div></div>
+        <div class="card stat"><div class="ic">👥</div><div class="v">3</div><div class="l">assumable roles</div></div>
+        <div class="card stat"><div class="ic">🔎</div><div class="v">2</div><div class="l">ABAC policies</div></div>
+        <div class="card stat"><div class="ic">🇫🇷</div><div class="v">FR·BE</div><div class="l">cross-domain scope</div></div>
+      </div>
+      <p style="margin-top:28px;font-family:'JetBrains Mono';font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:rgba(0,61,124,.5)">Synthetic data only · not real data · use ← → to navigate</p>
+    </div></section>
+
+    <!-- 2 · TWO DOMAINS -->
+    <section class="slide" id="domains"><div class="inner">
+      <div class="kicker"><span class="n">01</span><span class="ln"></span><span>The data</span></div>
+      <h2>Two domains, one <span class="grad">shared</span> country key</h2>
+      <p class="sub">Both fact tables carry a <span class="mono">country_code</span> (FR, BE, NL, DE) — the dimension the row-level policy keys on, and the join to the shared reference table.</p>
+      <div class="grid g3" style="margin-top:28px">
+        <div class="card" style="border:1px solid rgba(0,195,137,.3)">
+          <div class="row"><div class="ic">🌬️</div><div><div style="font-family:'Plus Jakarta Sans';font-weight:700;color:var(--navy)">Renewable Generation</div><div class="mono" style="border:none;background:none;padding:0;color:rgba(0,61,124,.6)">56 rows</div></div></div>
+          <div class="mono" style="margin-top:14px;width:100%">generation.generation_daily</div>
+          <div class="chips"><span class="chip">site_id</span><span class="chip">country_code</span><span class="chip">asset_type</span><span class="chip">generation_mwh</span><span class="chip">availability_pct</span></div>
+          <p class="muted" style="margin-top:14px">Domain 1 — sites across FR / BE / NL / DE, daily output &amp; availability.</p>
+        </div>
+        <div class="card" style="border:1px solid rgba(255,122,89,.3)">
+          <div class="row"><div class="ic">🏙️</div><div><div style="font-family:'Plus Jakarta Sans';font-weight:700;color:var(--navy)">District Heating</div><div class="mono" style="border:none;background:none;padding:0;color:rgba(0,61,124,.6)">36 rows</div></div></div>
+          <div class="mono" style="margin-top:14px;width:100%">heating.heating_consumption</div>
+          <div class="chips"><span class="chip">segment_id</span><span class="chip">customer_segment</span><span class="chip">country_code</span><span class="chip">consumption_mwh</span></div>
+          <p class="muted" style="margin-top:14px">Domain 2 — anonymized customer segments, monthly consumption by country.</p>
+        </div>
+        <div class="card" style="border:1px solid rgba(0,189,255,.3)">
+          <div class="row"><div class="ic">🌍</div><div><div style="font-family:'Plus Jakarta Sans';font-weight:700;color:var(--navy)">Shared reference</div><div class="mono" style="border:none;background:none;padding:0;color:rgba(0,61,124,.6)">in BOTH domains</div></div></div>
+          <div class="mono" style="margin-top:14px;width:100%">shared.country_reference</div>
+          <div class="chips"><span class="chip">country_code</span><span class="chip">country_name</span><span class="chip">region</span><span class="chip">currency</span></div>
+          <p class="muted" style="margin-top:14px">Country dimension readable by all roles — a shared asset, not row-filtered.</p>
+        </div>
+      </div>
+    </div></section>
+
+    <!-- 3 · RBAC -->
+    <section class="slide" id="rbac"><div class="inner">
+      <div class="kicker"><span class="n">02</span><span class="ln"></span><span>RBAC · role-based access</span></div>
+      <h2>Join a group, <span class="grad">assume</span> a role</h2>
+      <p class="sub">Users join a <b>member group</b> that may <b>ASSUME</b> a <b>role</b>. Data is granted to roles only — member groups hold no access.</p>
+      <div class="grid g3" style="margin-top:28px">
+        <div class="card">
+          <div class="mono" style="border:none;background:none;padding:0">👤 generation_users</div>
+          <div style="color:var(--magenta);font-family:'JetBrains Mono';font-size:11px;letter-spacing:.12em;text-transform:uppercase;margin:12px 0 10px">↓ assume</div>
+          <div class="mono" style="width:100%;background:rgba(0,61,124,.05)">🔑 role_generation</div>
+          <div style="margin-top:14px"><div class="muted ok">✓ Generation</div><div class="muted no">✕ Heating — denied</div></div>
+        </div>
+        <div class="card">
+          <div class="mono" style="border:none;background:none;padding:0">👤 heating_users</div>
+          <div style="color:var(--magenta);font-family:'JetBrains Mono';font-size:11px;letter-spacing:.12em;text-transform:uppercase;margin:12px 0 10px">↓ assume</div>
+          <div class="mono" style="width:100%;background:rgba(0,61,124,.05)">🔑 role_heating</div>
+          <div style="margin-top:14px"><div class="muted ok">✓ Heating</div><div class="muted no">✕ Generation — denied</div></div>
+        </div>
+        <div class="card" style="border:1px solid rgba(229,0,91,.25)">
+          <div class="mono" style="border:none;background:none;padding:0">👤 cross_domain_users</div>
+          <div style="color:var(--magenta);font-family:'JetBrains Mono';font-size:11px;letter-spacing:.12em;text-transform:uppercase;margin:12px 0 10px">↓ assume</div>
+          <div class="mono" style="width:100%;background:rgba(0,61,124,.05)">🔑 role_cross_domain</div>
+          <div style="margin-top:14px"><div class="muted ok">✓ Generation <span class="pill-m" style="float:right">FR rows only</span></div><div class="muted ok">✓ Heating <span class="pill-m" style="float:right">FR rows only</span></div></div>
+        </div>
+      </div>
+      <div class="card-dark callout" style="margin-top:22px">
+        <span style="font-size:20px">ℹ️</span>
+        <p style="font-size:14px;line-height:1.6;color:rgba(255,255,255,.85)">Assuming a role <b style="color:#fff">replaces</b> your base permissions with only that role's, for the session — one active role at a time. So even a workspace admin, acting as a role, is held to exactly what that role can see.</p>
+      </div>
+    </div></section>
+
+    <!-- 4 · ABAC -->
+    <section class="slide" id="abac"><div class="inner">
+      <div class="kicker"><span class="n">03</span><span class="ln"></span><span>ABAC · attribute-based access</span></div>
+      <h2>One governed tag, <span class="grad-m">one policy</span>, both domains</h2>
+      <p class="sub">A governed tag marks the <span class="mono">country_code</span> column so one catalog-scoped row filter covers both domains. <b>Which rows each role sees</b> comes from an <b>entitlement table keyed on the assumed role</b>: domain roles = all countries, the cross-domain role = <span class="mono">FR + BE</span>. Change access by editing a table row — no policy change.</p>
+      <div class="grid g2" style="margin-top:28px;align-items:stretch">
+        <div style="display:flex;flex-direction:column;gap:16px">
+          <div class="card">
+            <div class="muted ok" style="font-family:'JetBrains Mono';font-size:12px">✓ domain role · generation or heating</div>
+            <div class="chips" style="margin-top:12px">
+              <span class="cc" style="background:rgba(0,195,137,.1);color:var(--green)">FR</span>
+              <span class="cc" style="background:rgba(0,195,137,.1);color:var(--green)">BE</span>
+              <span class="cc" style="background:rgba(0,195,137,.1);color:var(--green)">NL</span>
+              <span class="cc" style="background:rgba(0,195,137,.1);color:var(--green)">DE</span>
+            </div>
+            <p class="muted" style="margin-top:12px">All countries, within its one permitted domain.</p>
+          </div>
+          <div class="card" style="border:1px solid rgba(229,0,91,.3)">
+            <div style="font-family:'JetBrains Mono';font-size:12px;color:rgba(0,30,98,.7)">🏷️ role_cross_domain · both domains</div>
+            <div class="chips" style="margin-top:12px">
+              <span class="cc" style="background:rgba(229,0,91,.15);color:var(--magenta);box-shadow:0 0 0 2px rgba(229,0,91,.4) inset">FR</span>
+              <span class="cc" style="background:rgba(229,0,91,.15);color:var(--magenta);box-shadow:0 0 0 2px rgba(229,0,91,.4) inset">BE</span>
+              <span class="cc" style="background:rgba(0,30,98,.04);color:rgba(0,30,98,.3);text-decoration:line-through">NL</span>
+              <span class="cc" style="background:rgba(0,30,98,.04);color:rgba(0,30,98,.3);text-decoration:line-through">DE</span>
+            </div>
+            <p class="muted" style="margin-top:12px">Both domains — but the entitlement table limits this role to <b style="color:var(--magenta)">FR + BE</b>.</p>
+            <p class="muted" style="margin-top:8px">A second ABAC policy — a <b>column mask</b> — redacts <span class="mono">site_name</span> → <b style="color:var(--magenta)">REDACTED</b> for this role.</p>
+          </div>
+        </div>
+        <div class="card-dark" style="padding:0;overflow:hidden">
+          <div class="codehead"><span class="d"></span><span class="d"></span><span class="d"></span>&nbsp;01_governed_tag_abac.sql</div>
+<pre><span style="color:var(--coral)">-- entitlement table, keyed on the assumed role</span>
+INSERT INTO gov.role_country_entitlements VALUES
+  ('role_generation',  'ALL'),
+  ('role_heating',     'ALL'),
+  ('role_cross_domain','FR'),
+  ('role_cross_domain','BE');
+
+CREATE FUNCTION gov.country_entitlement_filter(
+    row_country STRING) RETURNS BOOLEAN
+  RETURN EXISTS (SELECT 1
+    FROM gov.role_country_entitlements e
+    WHERE e.role_name = <span style="color:var(--glow)">session_user()</span>
+      AND (e.country_code = 'ALL'
+           OR e.country_code = row_country));
+
+CREATE POLICY country_row_filter
+  ON CATALOG governance_demo
+  ROW FILTER gov.country_entitlement_filter
+  TO `role_generation`, `role_heating`,
+     `role_cross_domain`
+  FOR TABLES
+  MATCH COLUMNS <span style="color:var(--coral)">has_tag('country')</span> AS cc
+  USING COLUMNS (cc);</pre>
+        </div>
+      </div>
+      <div class="callout" style="border:1px solid rgba(255,122,89,.3);background:rgba(255,122,89,.06)">
+        <span style="font-size:20px">⚠️</span>
+        <p class="muted">The filter compares <span class="mono">session_user()</span> — the <b>active role</b>. It must not use <span class="mono">is_account_group_member('role_…')</span>: a role is not a member of itself, so that is always false.</p>
+      </div>
+    </div></section>
+
+    <!-- 5 · GENIE & DISCOVER -->
+    <section class="slide" id="genie"><div class="inner">
+      <div class="kicker"><span class="n">04</span><span class="ln"></span><span>Genie &amp; Discover</span></div>
+      <h2>The same rules, <span class="grad-g">everywhere</span></h2>
+      <p class="sub">Natural-language Genie and the Discover catalog both run as the asking user — so Unity Catalog grants and the ABAC filter apply there too.</p>
+      <div class="grid g2" style="margin-top:28px">
+        <div class="card">
+          <div class="row"><div class="ic">✨</div><div style="font-family:'Plus Jakarta Sans';font-weight:700;color:var(--navy)">Genie</div></div>
+          <ul class="muted" style="margin-top:14px;list-style:none;display:flex;flex-direction:column;gap:10px">
+            <li>✓ Two single-domain spaces — <span class="mono">Generation</span> &amp; <span class="mono">Heating</span> — one per team.</li>
+            <li>✓ Cross-domain questions run on <b style="color:var(--navy)">Genie One</b> ("Ask Genie").</li>
+            <li>✓ Genie writes &amp; runs SQL <b style="color:var(--navy)">as you</b> → cross-domain role gets FR + BE only.</li>
+          </ul>
+          <p style="margin-top:16px;border-radius:12px;background:rgba(0,189,255,.06);padding:8px 12px;font-size:13px;color:var(--deep)"><b>CAN_RUN ≠ data access.</b> Space access never bypasses Unity Catalog.</p>
+        </div>
+        <div class="card">
+          <div class="row"><div class="ic">🧭</div><div style="font-family:'Plus Jakarta Sans';font-weight:700;color:var(--navy)">Discover</div></div>
+          <ul class="muted" style="margin-top:14px;list-style:none;display:flex;flex-direction:column;gap:10px">
+            <li>✓ Domain <b style="color:var(--navy)">Energy Operations</b> with 2 subdomains + a shared asset.</li>
+            <li>📄 Business-rule <b style="color:var(--navy)">Pages</b> on each domain (metric definitions, the geo rule).</li>
+            <li>✓ Permission-aware: you browse only the assets you can access.</li>
+          </ul>
+          <p style="margin-top:16px;border-radius:12px;background:rgba(0,195,137,.07);padding:8px 12px;font-size:13px;color:var(--deep)">Pages <b>inherit</b> domain access — no separate ACL to manage.</p>
+        </div>
+      </div>
+    </div></section>
+
+    <!-- 6 · ONTOLOGY -->
+    <section class="slide" id="ontology"><div class="inner">
+      <div class="kicker"><span class="n">05</span><span class="ln"></span><span>Ontology · modeled + learned knowledge</span></div>
+      <h2>KPIs defined once, <span class="grad-g">trusted everywhere</span></h2>
+      <p class="sub">The <b>ontology</b> is the context Genie searches to turn a question into the right SQL. We <b>model</b> it — certified metric views, rich comments, PK/FK relationships, a sites dimension — and the dashboard &amp; queries add <b>learned</b> knowledge. The same certified measure answers in a dashboard <b>and</b> in Genie One.</p>
+      <div class="grid g2" style="margin-top:28px;align-items:stretch">
+        <div style="display:flex;flex-direction:column;gap:16px">
+          <div class="card" style="border:1px solid rgba(0,195,137,.3)">
+            <div class="row"><div class="ic">📏</div><div style="font-family:'Plus Jakarta Sans';font-weight:700;color:var(--navy)">Two certified metric views</div></div>
+            <div class="chips" style="margin-top:12px"><span class="mono">generation.generation_metrics</span><span class="mono">heating.heating_metrics</span></div>
+            <p class="muted" style="margin-top:12px">Governed KPIs defined once — <b>Capacity Factor</b>, Availability, Generation, Consumption — queried with <span class="mono">MEASURE()</span>. <span class="pill-g">✓ certified</span></p>
+          </div>
+          <div class="card">
+            <div class="row"><div class="ic">🧩</div><div style="font-family:'Plus Jakarta Sans';font-weight:700;color:var(--navy)">Semantics Genie reads</div></div>
+            <ul class="muted" style="margin-top:12px;list-style:none;display:flex;flex-direction:column;gap:8px">
+              <li>💬 Table &amp; column <b style="color:var(--navy)">comments + synonyms</b> — self-documenting.</li>
+              <li>🔗 <b style="color:var(--navy)">PK / FK</b> relationships (RELY) → the join graph.</li>
+              <li>🗂️ New sites dimension <span class="mono">asset_reference</span> (nameplate capacity).</li>
+            </ul>
+          </div>
+        </div>
+        <div class="card-dark" style="padding:0;overflow:hidden">
+          <div class="codehead"><span class="d"></span><span class="d"></span><span class="d"></span>&nbsp;02_ontology_metrics.sql</div>
+<pre><span style="color:var(--coral)">-- define the KPI once, in YAML</span>
+CREATE VIEW generation.generation_metrics
+  WITH METRICS LANGUAGE YAML AS $$
+  measures:
+    - name: Capacity Factor Pct
+      expr: 100 * SUM(generation_mwh)
+            / SUM(<span style="color:var(--glow)">dim_asset.capacity_mw</span> * 24)
+  $$;
+<span style="color:var(--coral)">-- mark it trusted for Genie</span>
+ALTER VIEW generation.generation_metrics SET TAGS
+  ('system.certification_status'='certified');
+
+<span style="color:var(--coral)">-- one measure, reused everywhere</span>
+SELECT `Asset Type`,
+  <span style="color:var(--glow)">MEASURE(`Capacity Factor Pct`)</span>
+FROM generation.generation_metrics
+GROUP BY `Asset Type`;  <span style="color:var(--coral)">-- wind ~55% · solar ~19%</span></pre>
+        </div>
+      </div>
+      <div class="card-dark callout" style="margin-top:22px">
+        <span style="font-size:20px">✨</span>
+        <p style="font-size:14px;line-height:1.6;color:rgba(255,255,255,.85)">An <b style="color:#fff">AI/BI dashboard</b> and <b style="color:#fff">Genie One</b> read the <b style="color:#fff">same certified measure</b> — and the published dashboard feeds its queries back as learned knowledge. Because the metric views sit on the governed base tables, the KPIs stay governed: the dashboard is published with <b style="color:#fff">individual data permission</b>, so each viewer runs it with their own UC permissions and the cross-domain role's numbers cover <b style="color:var(--glow)">FR + BE only</b> — the same governance in the dashboard as in Genie One.</p>
+      </div>
+    </div></section>
+
+    <!-- 7 · DEMO 1 · GOVERNANCE (Tell / Show / Tell) -->
+    <section class="slide" id="scenario-gov"><div class="inner">
+      <div class="kicker"><span class="n">06</span><span class="ln"></span><span>Demo 1 · Governance (RBAC + ABAC)</span></div>
+      <h2>Switch role, watch access <span class="grad">change</span></h2>
+      <div class="card" style="margin-top:18px;border-left:4px solid var(--blue)">
+        <span class="pill">① Tell — what we'll show</span>
+        <p class="muted" style="margin-top:10px">Access is decided by your <b style="color:var(--navy)">active role</b>. Same person — I switch identity in the top bar and prove, live in SQL, that the view changes: domain isolation from <b>RBAC</b>, plus <b style="color:var(--magenta)">FR + BE</b> rows and masked site names from <b>ABAC</b> — enforced by Unity Catalog, never the app.</p>
+      </div>
+      <div style="margin-top:14px"><span class="pill-m">② Show — live on Databricks</span></div>
+      <div style="display:flex;flex-direction:column;gap:8px;margin-top:10px">
+        <div class="card step"><div class="row" style="flex:1"><div class="num">1</div><div><div class="mono" style="border:none;background:none;padding:0;font-weight:600;color:var(--deep)">as admin · no role assumed</div><div class="muted" style="font-size:13px">count generation by country — the "before"</div></div></div><div class="chips" style="margin:0;justify-content:flex-end"><span class="oc ok">✓ BE · DE · FR · NL</span></div></div>
+        <div class="card step"><div class="row" style="flex:1"><div class="num">2</div><div><div class="mono" style="border:none;background:none;padding:0;font-weight:600;color:var(--deep)">Assume role → role_generation</div><div class="muted" style="font-size:13px">query each domain</div></div></div><div class="chips" style="margin:0;justify-content:flex-end"><span class="oc ok">✓ generation: all</span><span class="oc no">✕ heating: DENIED</span></div></div>
+        <div class="card step"><div class="row" style="flex:1"><div class="num">3</div><div><div class="mono" style="border:none;background:none;padding:0;font-weight:600;color:var(--deep)">Assume role → role_cross_domain</div><div class="muted" style="font-size:13px">query both domains</div></div></div><div class="chips" style="margin:0;justify-content:flex-end"><span class="oc ok">✓ gen: FR+BE (28)</span><span class="oc ok">✓ heat: FR+BE (18)</span></div></div>
+        <div class="card step"><div class="row" style="flex:1"><div class="num">4</div><div><div class="mono" style="border:none;background:none;padding:0;font-weight:600;color:var(--deep)">same role · site_name + session_user()</div><div class="muted" style="font-size:13px">the ABAC column mask + the active identity</div></div></div><div class="chips" style="margin:0;justify-content:flex-end"><span class="oc no">✕ site_name: REDACTED</span><span class="oc ok">✓ session_user = role</span></div></div>
+      </div>
+      <div class="card-dark callout" style="margin-top:16px">
+        <span style="font-size:20px">✅</span>
+        <p style="font-size:14px;line-height:1.6;color:rgba(255,255,255,.85)"><b style="color:#fff">③ Tell — the result.</b> Three identities, three views. RBAC picked the context; ABAC filtered the rows <i>and</i> columns within it. One row-filter + one mask cover both tables — to change who sees which country, edit a single row in the entitlement table, <b style="color:var(--glow)">no DDL</b>.</p>
+      </div>
+    </div></section>
+
+    <!-- 8 · DEMO 2 · DISCOVER + GENIE ONE (Tell / Show / Tell) -->
+    <section class="slide" id="scenario-discover"><div class="inner">
+      <div class="kicker"><span class="n">07</span><span class="ln"></span><span>Demo 2 · Discover Pages + Genie One</span></div>
+      <h2>Find it by business area, <span class="grad-g">just ask</span></h2>
+      <div class="card" style="margin-top:18px;border-left:4px solid var(--green)">
+        <span class="pill-g">① Tell — what we'll show</span>
+        <p class="muted" style="margin-top:10px">A business user finds governed data by <b style="color:var(--navy)">business area</b> and asks in plain language. I browse the Discover domain, open the business-rule <b>Page</b>, then ask <b>Genie One</b> a KPI question — the <b>certified metric view</b> answers precisely, still governed to my active role.</p>
+      </div>
+      <div style="margin-top:14px"><span class="pill-m">② Show — live on Databricks</span></div>
+      <div class="grid g2" style="margin-top:10px;align-items:stretch">
+        <div class="card" style="border-left:4px solid var(--green)">
+          <div class="row"><div class="ic">📄</div><div style="font-family:'Plus Jakarta Sans';font-weight:700;color:var(--navy)">Browse · 3 governed Pages</div></div>
+          <p class="muted" style="margin-top:8px;font-size:13px"><b style="color:var(--navy)">Discover → Browse by domain → Energy Operations.</b> Pages are business-rule wikis the ontology reads — authoritative rules, in plain language:</p>
+          <ul class="muted" style="margin-top:10px;list-style:none;display:flex;flex-direction:column;gap:9px;font-size:13px">
+            <li>🌍 <b style="color:var(--navy)">Geo access rule</b> — cross-domain sees FR + BE only <span class="chip">parent</span></li>
+            <li>🌬️ <b style="color:var(--navy)">Renewable generation metrics</b> — availability &lt; 85% → maintenance review <span class="chip">generation</span></li>
+            <li>🏙️ <b style="color:var(--navy)">District-heating consumption metrics</b> — segments anonymized, monthly <span class="chip">heating</span></li>
+          </ul>
+          <p class="muted" style="margin-top:10px;font-size:12px">…plus the <b style="color:var(--green)">Certified</b> metric views in the domain.</p>
+        </div>
+        <div class="card" style="border-left:4px solid var(--blue)">
+          <div class="row"><div class="ic">💬</div><div style="font-family:'Plus Jakarta Sans';font-weight:700;color:var(--navy)">Ask Genie — runs as the active role</div></div>
+          <p class="muted" style="margin-top:8px;font-size:13px">Assume each role in the top bar; Genie runs the SQL <b style="color:var(--navy)">as that role</b>. Domain analysts see all countries; the cross-domain consumer gets the same answers governed to <b style="color:var(--magenta)">FR + BE</b>.</p>
+          <ol style="margin-top:10px;display:flex;flex-direction:column;gap:9px;font-size:13px;color:rgba(0,30,98,.82);padding-left:18px">
+            <li><span class="chip">generation space</span> "Capacity factor of wind vs solar, by country." <span class="chip">metric + asset &amp; country joins</span></li>
+            <li><span class="chip">generation space</span> "Utilization by technology — and which sites fall under the 85% maintenance rule?" <span class="chip">synonyms + Page rule</span></li>
+            <li><span class="chip">heating space</span> "Rank customer segments by consumption + share of total." <span class="chip">certified heating metric</span></li>
+            <li><span class="chip">Genie One · cross-domain</span> "For France, generation vs heating by month" — then re-ask #1 → <b style="color:var(--magenta)">FR + BE only</b>. <span class="chip">both metrics + governance</span></li>
+          </ol>
+          <p class="muted" style="margin-top:10px;font-size:12px">Without the ontology, "utilization" and the 85% rule are guesswork; with it Genie answers precisely — and the cross-domain consumer's answers stay <b style="color:var(--magenta)">FR + BE only</b>.</p>
+        </div>
+      </div>
+      <div class="grid g2" style="margin-top:10px">
+        <div class="card step"><div class="row" style="flex:1"><div class="num" style="background:var(--magenta)">✕</div><div><div class="mono" style="border:none;background:none;padding:0;font-weight:600;color:var(--deep)">push the boundary</div><div class="muted" style="font-size:13px">"Show heating consumption for Germany."</div></div></div><div class="chips" style="margin:0;justify-content:flex-end"><span class="oc no">✕ no rows (ABAC)</span></div></div>
+        <div class="card step"><div class="row" style="flex:1"><div class="num" style="background:var(--green)">✓</div><div><div class="mono" style="border:none;background:none;padding:0;font-weight:600;color:var(--deep)">dashboard "Energy KPIs (Governed)"</div><div class="muted" style="font-size:13px">individual data permission — runs as the viewer</div></div></div><div class="chips" style="margin:0;justify-content:flex-end"><span class="oc ok">✓ FR+BE · same as Genie</span></div></div>
+      </div>
+      <div class="card-dark callout" style="margin-top:16px">
+        <span style="font-size:20px">✨</span>
+        <p style="font-size:14px;line-height:1.6;color:rgba(255,255,255,.85)"><b style="color:#fff">③ Tell — the result.</b> The ontology gave Genie the business meaning — domains, <b style="color:#fff">three governed Pages</b>, synonyms, and <b style="color:#fff">certified metric views</b> — so it answered complex questions precisely instead of guessing SQL. And governance held end-to-end: <b style="color:var(--glow)">FR + BE only</b>, in Genie <i>and</i> in the dashboard.</p>
+      </div>
+    </div></section>
+
+    <!-- 7 · RECAP -->
+    <section class="slide" id="recap"><div class="inner">
+      <div class="card-dark">
+        <div class="kicker" style="color:var(--glow)"><img src="favicon.svg" width="20" height="20" alt=""/>&nbsp;Takeaway</div>
+        <h2 style="color:#fff;margin-top:6px">RBAC selects the <span style="color:var(--glow)">context</span>. ABAC protects the <span style="color:var(--coral)">rows</span> within it.</h2>
+        <div style="margin-top:20px;display:flex;flex-wrap:wrap;gap:16px;font-size:14px;color:rgba(255,255,255,.8)">
+          <span>🔑 Assume a role → active access context</span>
+          <span>🔎 Tag-driven ABAC → FR + BE rows</span>
+        </div>
+        <p style="margin-top:22px;font-family:'Plus Jakarta Sans';font-weight:600;font-size:18px;color:rgba(255,255,255,.9)">Grant once · enforced everywhere · provable in SQL.</p>
+      </div>
+      <div class="grid g2" style="margin-top:20px">
+        <div class="card">
+          <div style="font-family:'Plus Jakarta Sans';font-weight:700;color:var(--navy)">⌨️ Run it</div>
+          <ol style="margin-top:14px;list-style:none;display:flex;flex-direction:column;gap:6px" id="runsteps"></ol>
+        </div>
+        <div class="card">
+          <div style="font-family:'Plus Jakarta Sans';font-weight:700;color:var(--navy)">Honest by design</div>
+          <ul class="muted" style="margin-top:14px;list-style:none;display:flex;flex-direction:column;gap:10px">
+            <li>• Persona switching is the native <b style="color:var(--navy)">RBAC role switcher</b> — a real permission swap.</li>
+            <li>• Least privilege: data granted to <b style="color:var(--navy)">roles</b>, never to member groups.</li>
+            <li>• Run persona tests <b style="color:var(--navy)">as an assumed role</b> — a bare admin bypasses the filter.</li>
+            <li>• A passing demo is not a formal security certification.</li>
+          </ul>
+          <div class="mono" style="margin-top:18px;width:100%">github.com/AlexPicard10/uc-rbac-abac-governance-demo</div>
+        </div>
+      </div>
+    </div></section>
+  </main>
+
+  <div class="navi"><div class="bar">
+    <button id="prev" aria-label="Previous">‹</button>
+    <div class="pips" id="pips"></div>
+    <span class="label" id="label"></span>
+    <button id="next" class="next" aria-label="Next">›</button>
+  </div></div>
+
+<script>
+  var runsteps =['scripts/setup_profiles.sh — workspace + account OAuth','driver/00_preflight.py — read-only checks','driver/10_identity_setup.py — groups + ASSUME + entitlements','driver/20_governance.py — data + ABAC + ontology (metric views)','driver/30_genie_space.py — domain Genie spaces + metric views','driver/35_discover_domains.py — domains, shared asset, Pages','driver/50_dashboard.py — AI/BI dashboard on the metric views','driver/40_validate.py — metadata checks + runbook'];
+  document.getElementById('runsteps').innerHTML = runsteps.map(function(s,i){
+    return '<li style="display:flex;gap:8px;font-family:\'JetBrains Mono\';font-size:12px;color:rgba(0,30,98,.75)"><span style="color:var(--magenta)">'+String(i+1).padStart(2,'0')+'</span><span>'+s+'</span></li>';
+  }).join('');
+
+  var slides = Array.prototype.slice.call(document.querySelectorAll('.slide'));
+  var ids = slides.map(function(s){return s.id;});
+  var labels = ['Intro','Two domains','RBAC','ABAC','Genie & Discover','Ontology','Demo · Governance','Demo · Discover + Genie','Takeaway'];
+  var active = Math.max(0, ids.indexOf(location.hash.slice(1)));
+  var pips = document.getElementById('pips');
+  pips.innerHTML = slides.map(function(_,i){return '<button class="pip" data-i="'+i+'"></button>';}).join('');
+  var pipEls = Array.prototype.slice.call(pips.children);
+
+  function show(i){
+    active = Math.max(0, Math.min(slides.length-1, i));
+    slides.forEach(function(s,k){ s.classList.toggle('active', k===active); if(k===active) s.scrollTop=0; });
+    pipEls.forEach(function(p,k){ p.classList.toggle('on', k===active); });
+    document.getElementById('prev').disabled = active===0;
+    document.getElementById('next').disabled = active===slides.length-1;
+    document.getElementById('label').textContent = String(active+1).padStart(2,'0')+' · '+labels[active];
+    if(location.hash.slice(1)!==ids[active]) history.replaceState(null,'','#'+ids[active]);
+  }
+  document.getElementById('prev').onclick = function(){ show(active-1); };
+  document.getElementById('next').onclick = function(){ show(active+1); };
+  pipEls.forEach(function(p){ p.onclick = function(){ show(+p.dataset.i); }; });
+  document.querySelectorAll('a[href^="#"]').forEach(function(a){
+    a.onclick = function(e){ var i = ids.indexOf(a.getAttribute('href').slice(1)); if(i>=0){ e.preventDefault(); show(i);} };
+  });
+  window.addEventListener('keydown', function(e){
+    if(e.key==='ArrowRight'||e.key==='PageDown'||e.key===' '){ e.preventDefault(); show(active+1); }
+    else if(e.key==='ArrowLeft'||e.key==='PageUp'){ e.preventDefault(); show(active-1); }
+    else if(e.key==='Home'){ e.preventDefault(); show(0); }
+    else if(e.key==='End'){ e.preventDefault(); show(slides.length-1); }
+  });
+  show(active);
+</script>
+</body>
+</html>

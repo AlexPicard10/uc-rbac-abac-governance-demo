@@ -1,0 +1,27 @@
+# Databricks Asset Bundle — Unity Catalog RBAC + ABAC demo
+# Deploys the SQL "notebooks", the Python driver, and docs into the workspace,
+# and defines a convenience job that runs the governance SQL on a SQL warehouse.
+#
+# IMPORTANT ordering: account-level identity (groups + ASSUME) must be created
+# FIRST with `python driver/10_identity_setup.py` (a workspace job cannot do
+# account-admin work). The bundle job only covers the workspace-level SQL.
+# https://docs.databricks.com/dev-tools/bundles/index.html
+bundle:
+  name: governance_demo
+
+include:
+  - resources/*.yml
+
+variables:
+  catalog:
+    description: Demo catalog (must already exist or be creatable by you).
+    default: governance_demo
+  warehouse_id:
+    description: Pro/serverless SQL warehouse id used by the governance SQL tasks.
+    default: 0000000000000000   # <-- change to your workspace's warehouse id
+
+targets:
+  dev:
+    mode: development
+    default: true
+    # workspace host is taken from your --profile; no host hard-coded here.
